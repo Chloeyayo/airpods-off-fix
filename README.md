@@ -32,6 +32,14 @@
 3. 在 LSPosed 中启用模块，并确认“推荐应用”已选中。
 4. 重启手机，或重启 Bluetooth / Accessory / MyDevices 相关进程。
 
+## Non-root 实验版
+
+仓库同时提供一个实验 non-root 版：`AirpodsOffFix-NonRoot-v0.1.apk`。
+
+它不是 LSPosed 模块，不能注入系统蓝牙进程，因此不能阻止 ColorOS 发送禁用 Off 的包。它采用另一条路线：作为普通应用尝试连接 AirPods 的 L2CAP PSM `4097`，然后发送“恢复 Off 可用”和“切到 Off 模式”的 AAP 指令。
+
+这个版本需要手动打开应用、选择已配对 AirPods 并点击 `Restore Off`。如果系统蓝牙进程已经占用同一通道，连接可能失败。
+
 ## 从源码构建
 
 当前构建脚本是 Windows PowerShell 脚本，期望本地存在：
@@ -50,6 +58,18 @@
 
 ```text
 build\AirpodsOffFix.apk
+```
+
+构建 non-root 实验版：
+
+```powershell
+.\build_nonroot.ps1
+```
+
+输出 APK：
+
+```text
+build-nonroot\AirpodsOffFix-NonRoot.apk
 ```
 
 ## 说明
@@ -88,6 +108,14 @@ If LSPosed does not select them automatically, select these three apps manually 
 3. Enable the module in LSPosed and confirm the recommended apps are selected.
 4. Reboot the phone, or restart the Bluetooth / Accessory / MyDevices related processes.
 
+## Non-root Experimental Build
+
+The repository also provides an experimental non-root build: `AirpodsOffFix-NonRoot-v0.1.apk`.
+
+It is not an LSPosed module and cannot inject into the system Bluetooth process, so it cannot block the ColorOS packet that disables the `Off` mode. Instead, it tries a different approach: as a normal app, it connects to the AirPods L2CAP PSM `4097`, then sends AAP commands to restore `Off` availability and switch to `Off` mode.
+
+This version must be opened manually. Select a paired AirPods device and tap `Restore Off`. If the system Bluetooth process already owns the same channel, the connection may fail.
+
 ## Build From Source
 
 The current build script is a Windows PowerShell script. It expects:
@@ -106,6 +134,18 @@ Output APK:
 
 ```text
 build\AirpodsOffFix.apk
+```
+
+Build the non-root experimental APK:
+
+```powershell
+.\build_nonroot.ps1
+```
+
+Output APK:
+
+```text
+build-nonroot\AirpodsOffFix-NonRoot.apk
 ```
 
 ## Notes

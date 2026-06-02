@@ -1,8 +1,10 @@
 build/
+build-nonroot/
 sdk/
 
 *.apk
 !dist/AirpodsOffFix-LSPosed-patch-v1.6.apk
+!dist/AirpodsOffFix-NonRoot-v0.1.apk
 !dist/AirpodsOffFix-LSPosed-patch-v1.7.apk
 *.idsig
 *.keystore
