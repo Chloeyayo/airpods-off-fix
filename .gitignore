@@ -6,6 +6,7 @@ sdk/
 !dist/AirpodsOffFix-LSPosed-patch-v1.6.apk
 !dist/AirpodsOffFix-NonRoot-v0.1.apk
 !dist/AirpodsOffFix-LSPosed-patch-v1.7.apk
+!dist/AirpodsOffFix-LSPosed-patch-v1.8.apk
 *.idsig
 *.keystore
 
@@ -34,3 +35,4 @@ oplusbt_bad/
 lspd-check/
 lspd-live/
 lspd-live-pull/
+.scratch/

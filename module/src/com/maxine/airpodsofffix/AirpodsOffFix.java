@@ -13,26 +13,37 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ColorOS 16 / AirPods Pro 3 fixes:
+ * ColorOS / AirPods fixes. Targets ColorOS 16 (oplusrom V16.1.0) MyDevices 17.1.5,
+ * still compatible with older ColorOS via name fallbacks.
  *
  *  1. Keep "Off" noise-control available: block the AAP
  *     DISABLE_OFF_LISTENING_MODE frame (04 00 04 00 09 00 34 02 00 00 00) that
  *     ColorOS sends on connect, which otherwise forces Off -> Transparency.
  *     Primary path: wrap BluetoothSocket.getOutputStream() and drop that exact
- *     11-byte frame. Fallback path: watch for com.oplus.bluetooth.feature.airpods
- *     .AirPodsManager (loaded by a CHILD loader of com.android.bluetooth) and
- *     hook its (OutputStream, byte[]) writers.
+ *     11-byte frame. This is byte-pattern based and survives MyDevices updates.
  *
- *  2. Show "Off" in MyDevices: hook AirpodsSettingActivity.q2(int) to add the
- *     0x200 "noise reduction shutdown" feature bit, and force the Off row visible
- *     after q2/r2/h2.
+ *  2. Show "Off" in MyDevices: the AirPods settings page builds its noise-control
+ *     selector from a feature mask. Bit 0x200 = "noise off supported". On AirPods
+ *     Pro that bit is cleared, so "Off" never appears. Hook the feature-support
+ *     method and OR 0x200 back in so the selector rebuilds WITH the Off option.
+ *       - v17.1.5: com.oplus.mydevices.bluetooth.airpods.AirpodsSettingActivity.m2(int)
+ *         -> AirpodsBluetoothManager$a.H(mask) parses (mask & 0x200) into r0
+ *         (supportsNoiseOff); m2() then rebuilds the selector (o2()/z1()).
+ *       - legacy:  com.heytap.mydevices.core.ui.apple.AirpodsSettingActivity.q2(int)
+ *         plus forcing the Off row View (e1()) visible.
  *
  *  3. Stop the bogus page grey-out: AirPods release the idle HFP link a few
- *     seconds after connect, and MyDevices treats any single-profile disconnect
- *     as a whole-device disconnect. Hook AirpodsBluetoothManager.I(state,device)
- *     and drop STATE_DISCONNECTED while the device is really still connected
- *     (A2DP/ACL up). A user-initiated disconnect (manager.o()) opens a short
- *     window in which STATE_DISCONNECTED is honored so the page greys out.
+ *     seconds after connect; the MyDevices broadcast receiver maps that single
+ *     profile drop (A2DP/HFP CONNECTION_STATE_CHANGED, extra.STATE==0) onto the
+ *     whole device by calling the state dispatcher with STATE_DISCONNECTED.
+ *     Hook the dispatcher and drop STATE_DISCONNECTED while the device is really
+ *     still connected (ACL up, isConnected()==true). A user-initiated disconnect
+ *     opens a short window in which STATE_DISCONNECTED is honored so the page
+ *     greys out.
+ *       - v17.1.5: AirpodsBluetoothManager.stateUpdate(String,BluetoothDevice)
+ *                  + disconnectAirpods() + isConnected()
+ *       - legacy:  AirpodsBluetoothManager.I(String,BluetoothDevice) + o()
+ *                  + reflective isConnected() on field d/device.
  *
  * Hook callbacks are NAMED static nested classes (not anonymous) to avoid a
  * d8/R8 internal crash on method-local anonymous classes.
@@ -42,14 +53,20 @@ public class AirpodsOffFix implements IXposedHookLoadPackage {
     private static final String TAG = "AirpodsOffFix";
     private static final String CLS = "com.oplus.bluetooth.feature.airpods.AirPodsManager";
     private static final String MYDEVICES_PKG = "com.heytap.mydevices";
-    private static final String MYDEVICES_AIRPODS_SETTINGS =
+
+    // AirPods settings page: moved package in MyDevices 17.x. Try new then legacy.
+    private static final String MYDEVICES_AIRPODS_SETTINGS_V17 =
+            "com.oplus.mydevices.bluetooth.airpods.AirpodsSettingActivity";
+    private static final String MYDEVICES_AIRPODS_SETTINGS_LEGACY =
             "com.heytap.mydevices.core.ui.apple.AirpodsSettingActivity";
+    // Connection manager: same FQN across versions, only method names changed.
     private static final String MYDEVICES_AIRPODS_BT_MANAGER =
             "com.heytap.mydevices.core.bluetooth.AirpodsBluetoothManager";
+
     private static final int FEATURE_NOISE_OFF = 0x200;
     // After the user taps "Disconnect" in MyDevices we must let STATE_DISCONNECTED
-    // through so the page greys out, even though BluetoothDevice.isConnected() can
-    // briefly still report true while the A2DP/HFP/ACL links tear down.
+    // through so the page greys out, even though isConnected() can briefly still
+    // report true while the A2DP/HFP/ACL links tear down.
     private static final long MYDEVICES_USER_DISCONNECT_WINDOW_MS = 8000L;
     private static volatile boolean sHooked = false;
     private static volatile long sMyDevicesUserDisconnectAtMs = 0L;
@@ -92,28 +109,91 @@ public class AirpodsOffFix implements IXposedHookLoadPackage {
         }
     }
 
+    // ----------------------------------------------------------------------
+    // MyDevices hooks (functions #2 and #3). Each hook is installed
+    // independently so a single renamed symbol can never disable the others.
+    // ----------------------------------------------------------------------
+
     private static void hookMyDevicesAirPodsSettings(ClassLoader cl) {
+        hookMyDevicesConnectionState(cl);
+        hookMyDevicesOffOption(cl);
+    }
+
+    /** Function #3: suppress bogus STATE_DISCONNECTED; honor user disconnect. */
+    private static void hookMyDevicesConnectionState(ClassLoader cl) {
+        Class<?> btManager;
         try {
-            Class<?> btManager = cl.loadClass(MYDEVICES_AIRPODS_BT_MANAGER);
-            Method setState = btManager.getDeclaredMethod("I", String.class,
-                    android.bluetooth.BluetoothDevice.class);
-            XposedBridge.hookMethod(setState, new MyDevicesBluetoothManagerStateHook());
-
-            // o() == disconnectAirpods(): opens the "user really wants to disconnect" window.
-            Method userDisconnect = btManager.getDeclaredMethod("o");
-            XposedBridge.hookMethod(userDisconnect, new MyDevicesUserDisconnectHook());
-
-            Class<?> activity = cl.loadClass(MYDEVICES_AIRPODS_SETTINGS);
-            Method updateFeatureSupport = activity.getDeclaredMethod("q2", int.class);
-            XposedBridge.hookMethod(updateFeatureSupport, new ForceMyDevicesOffModeHook());
-            Method refreshDeviceInfo = activity.getDeclaredMethod("r2");
-            XposedBridge.hookMethod(refreshDeviceInfo, new ForceMyDevicesOffRowAfterRefreshHook());
-            Method updateModel = activity.getDeclaredMethod("h2", String.class);
-            XposedBridge.hookMethod(updateModel, new ForceMyDevicesOffRowAfterRefreshHook());
-            XposedBridge.log(TAG + ": hooked MyDevices AirpodsBluetoothManager.I/o"
-                    + " and AirpodsSettingActivity.q2/r2/h2");
+            btManager = cl.loadClass(MYDEVICES_AIRPODS_BT_MANAGER);
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": ERROR hooking MyDevices AirPods settings: " + t);
+            XposedBridge.log(TAG + ": ERROR loading AirpodsBluetoothManager: " + t);
+            return;
+        }
+        // State dispatcher: v17 stateUpdate(String,BluetoothDevice), legacy I(...).
+        try {
+            Method state = findMethod(btManager, new String[]{"stateUpdate", "I"},
+                    String.class, android.bluetooth.BluetoothDevice.class);
+            if (state != null) {
+                XposedBridge.hookMethod(state, new MyDevicesStateHook());
+                XposedBridge.log(TAG + ": hooked AirpodsBluetoothManager." + state.getName()
+                        + "(state,device)");
+            } else {
+                XposedBridge.log(TAG + ": WARN no stateUpdate/I(String,BluetoothDevice)");
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + ": ERROR hooking state dispatcher: " + t);
+        }
+        // User disconnect: v17 disconnectAirpods(), legacy o().
+        try {
+            Method disc = findMethod(btManager, new String[]{"disconnectAirpods", "o"});
+            if (disc != null) {
+                XposedBridge.hookMethod(disc, new MyDevicesUserDisconnectHook());
+                XposedBridge.log(TAG + ": hooked AirpodsBluetoothManager." + disc.getName()
+                        + "() [user disconnect]");
+            } else {
+                XposedBridge.log(TAG + ": WARN no disconnectAirpods/o()");
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + ": ERROR hooking user disconnect: " + t);
+        }
+    }
+
+    /** Function #2: force the noise-control "Off" option to be available. */
+    private static void hookMyDevicesOffOption(ClassLoader cl) {
+        Class<?> activity = loadFirst(cl, MYDEVICES_AIRPODS_SETTINGS_V17, MYDEVICES_AIRPODS_SETTINGS_LEGACY);
+        if (activity == null) {
+            XposedBridge.log(TAG + ": ERROR AirpodsSettingActivity not found (v17/legacy)");
+            return;
+        }
+        boolean legacy = MYDEVICES_AIRPODS_SETTINGS_LEGACY.equals(activity.getName());
+        // Feature-support mask method: v17 m2(int), legacy q2(int).
+        try {
+            Method fm = findMethod(activity, new String[]{"m2", "q2"}, int.class);
+            if (fm != null) {
+                XposedBridge.hookMethod(fm, new ForceOffSupportHook(legacy));
+                XposedBridge.log(TAG + ": hooked " + activity.getName() + "." + fm.getName()
+                        + "(int) [force Off 0x200]");
+            } else {
+                XposedBridge.log(TAG + ": ERROR no m2/q2(int) on " + activity.getName());
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + ": ERROR hooking feature mask: " + t);
+        }
+        // Legacy UI also needed the Off row View forced visible after refresh.
+        // v17 rebuilds its selector from the mask, so this is legacy-only.
+        if (legacy) {
+            hookLegacyOffRowRefresh(activity);
+        }
+    }
+
+    private static void hookLegacyOffRowRefresh(Class<?> activity) {
+        for (String name : new String[]{"r2", "h2"}) {
+            try {
+                Method m = (name.equals("h2"))
+                        ? activity.getDeclaredMethod(name, String.class)
+                        : activity.getDeclaredMethod(name);
+                XposedBridge.hookMethod(m, new ForceLegacyOffRowHook());
+            } catch (Throwable ignore) {
+            }
         }
     }
 
@@ -174,6 +254,39 @@ public class AirpodsOffFix implements IXposedHookLoadPackage {
         sWatchers.clear();
     }
 
+    // ---- reflection helpers ------------------------------------------------
+
+    private static Class<?> loadFirst(ClassLoader cl, String... names) {
+        for (String n : names) {
+            try { return cl.loadClass(n); } catch (Throwable ignore) {}
+        }
+        return null;
+    }
+
+    private static Method findMethod(Class<?> cls, String[] names, Class<?>... params) {
+        for (String n : names) {
+            try {
+                Method m = cls.getDeclaredMethod(n, params);
+                m.setAccessible(true);
+                return m;
+            } catch (Throwable ignore) {}
+        }
+        return null;
+    }
+
+    private static Field findField(Class<?> cls, String... names) {
+        for (String n : names) {
+            try {
+                Field f = cls.getDeclaredField(n);
+                f.setAccessible(true);
+                return f;
+            } catch (Throwable ignore) {}
+        }
+        return null;
+    }
+
+    // ---- bluetooth AAP packet blocking (function #1, unchanged) -----------
+
     private static final class ClassResultWatcher extends XC_MethodHook {
         private final String source;
 
@@ -226,15 +339,120 @@ public class AirpodsOffFix implements IXposedHookLoadPackage {
         }
     }
 
-    private static boolean shouldPatchMyDevicesFeatureMask(Object activity, int mask) {
-        if ((mask & FEATURE_NOISE_OFF) != 0) return false;
-        return isMyDevicesOffModeTarget(activity, mask);
+    // ---- MyDevices Off-option hooks (function #2) -------------------------
+
+    /**
+     * Force the "noise off supported" bit (0x200) into the feature mask before
+     * the activity parses it, so the noise-control selector includes "Off".
+     */
+    private static final class ForceOffSupportHook extends XC_MethodHook {
+        private final boolean legacy;
+
+        ForceOffSupportHook(boolean legacy) {
+            this.legacy = legacy;
+        }
+
+        @Override
+        protected void beforeHookedMethod(MethodHookParam param) {
+            try {
+                if (param.args == null || param.args.length < 1
+                        || !(param.args[0] instanceof Integer)) {
+                    return;
+                }
+                int mask = ((Integer) param.args[0]).intValue();
+                if ((mask & FEATURE_NOISE_OFF) == 0) {
+                    param.args[0] = Integer.valueOf(mask | FEATURE_NOISE_OFF);
+                    XposedBridge.log(TAG + ": forced Off support mask 0x"
+                            + Integer.toHexString(mask) + " -> 0x"
+                            + Integer.toHexString(mask | FEATURE_NOISE_OFF));
+                }
+            } catch (Throwable t) {
+                XposedBridge.log(TAG + ": force Off support err " + t);
+            }
+        }
+
+        @Override
+        protected void afterHookedMethod(MethodHookParam param) {
+            // v17 rebuilds its selector from the patched mask inside the method;
+            // only the legacy UI needs the Off row View forced visible.
+            if (!legacy) return;
+            try {
+                forceLegacyOffRowVisible(param.thisObject);
+            } catch (Throwable ignore) {
+            }
+        }
     }
 
-    private static boolean isMyDevicesOffModeTarget(Object activity, int mask) {
-        if ((mask & FEATURE_NOISE_OFF) != 0) return true;
-        String model = getMyDevicesAirPodsModel(activity);
-        return model != null && model.contains("AirPods Pro 3");
+    private static final class ForceLegacyOffRowHook extends XC_MethodHook {
+        @Override
+        protected void afterHookedMethod(MethodHookParam param) {
+            try {
+                forceLegacyOffRowVisible(param.thisObject);
+            } catch (Throwable ignore) {
+            }
+        }
+    }
+
+    private static void forceLegacyOffRowVisible(Object activity) throws Exception {
+        if (activity == null) return;
+        Method offRowMethod = activity.getClass().getMethod("e1");
+        Object offRow = offRowMethod.invoke(activity);
+        if (offRow instanceof android.view.View) {
+            android.view.View row = (android.view.View) offRow;
+            row.setVisibility(android.view.View.VISIBLE);
+            row.setEnabled(true);
+            row.setClickable(true);
+            XposedBridge.log(TAG + ": forced legacy MyDevices Off row visible/clickable");
+        }
+    }
+
+    // ---- MyDevices connection-state hooks (function #3) -------------------
+
+    /**
+     * AirPods drop the idle HFP profile a few seconds after connect; the
+     * MyDevices broadcast receiver maps that single-profile disconnect onto the
+     * whole device. Drop the bogus STATE_DISCONNECTED while the device is really
+     * still connected, but honor a disconnect the user just asked for.
+     */
+    private static final class MyDevicesStateHook extends XC_MethodHook {
+        @Override
+        protected void beforeHookedMethod(MethodHookParam param) {
+            try {
+                if (param.args == null || param.args.length < 1
+                        || !(param.args[0] instanceof String)) {
+                    return;
+                }
+                String state = (String) param.args[0];
+                if ("STATE_CONNECTED".equals(state) || "STATE_BONDED".equals(state)) {
+                    sMyDevicesUserDisconnectAtMs = 0L;
+                    return;
+                }
+                if (!"STATE_DISCONNECTED".equals(state)) {
+                    return;
+                }
+                if (isRecent(sMyDevicesUserDisconnectAtMs, MYDEVICES_USER_DISCONNECT_WINDOW_MS)) {
+                    XposedBridge.log(TAG + ": allowing user-initiated MyDevices STATE_DISCONNECTED");
+                    return;
+                }
+                if (isMyDevicesManagerCurrentDeviceConnected(param.thisObject)) {
+                    param.setResult(null);
+                    XposedBridge.log(TAG + ": blocked false MyDevices STATE_DISCONNECTED"
+                            + " (device still connected)");
+                }
+            } catch (Throwable t) {
+                XposedBridge.log(TAG + ": MyDevices state hook err " + t);
+            }
+        }
+    }
+
+    private static final class MyDevicesUserDisconnectHook extends XC_MethodHook {
+        @Override
+        protected void beforeHookedMethod(MethodHookParam param) {
+            sMyDevicesUserDisconnectAtMs = System.currentTimeMillis();
+            XposedBridge.log(TAG + ": MyDevices user requested disconnect;"
+                    + " honoring STATE_DISCONNECTED for next "
+                    + MYDEVICES_USER_DISCONNECT_WINDOW_MS + "ms");
+        }
     }
 
     private static boolean isRecent(long timestamp, long windowMs) {
@@ -243,9 +461,18 @@ public class AirpodsOffFix implements IXposedHookLoadPackage {
 
     private static boolean isMyDevicesManagerCurrentDeviceConnected(Object manager) {
         if (manager == null) return false;
+        // v17.1.5: AirpodsBluetoothManager has a public isConnected() (ACL-level
+        // via the OplusBluetoothDevice wrapper) -- use the app's own logic.
         try {
-            Field deviceField = manager.getClass().getDeclaredField("d");
-            deviceField.setAccessible(true);
+            Method isConnected = manager.getClass().getMethod("isConnected");
+            Object r = isConnected.invoke(manager);
+            if (r instanceof Boolean) return ((Boolean) r).booleanValue();
+        } catch (Throwable ignore) {
+        }
+        // legacy fallback: wrap the device field in the Oplus wrapper.
+        try {
+            Field deviceField = findField(manager.getClass(), "device", "d");
+            if (deviceField == null) return false;
             Object device = deviceField.get(manager);
             if (device == null) return false;
             Class<?> wrapperClass = manager.getClass().getClassLoader()
@@ -261,132 +488,7 @@ public class AirpodsOffFix implements IXposedHookLoadPackage {
         }
     }
 
-    private static String getMyDevicesAirPodsModel(Object activity) {
-        if (activity == null) return null;
-        try {
-            Field modelField = activity.getClass().getDeclaredField("z0");
-            modelField.setAccessible(true);
-            Object model = modelField.get(activity);
-            return model instanceof String ? (String) model : null;
-        } catch (Throwable ignore) {
-            return null;
-        }
-    }
-
-    private static void forceMyDevicesOffRowVisible(Object activity) throws Exception {
-        if (activity == null) return;
-        Method offRowMethod = activity.getClass().getMethod("e1");
-        Object offRow = offRowMethod.invoke(activity);
-        if (offRow instanceof android.view.View) {
-            android.view.View row = (android.view.View) offRow;
-            row.setVisibility(android.view.View.VISIBLE);
-            row.setEnabled(true);
-            row.setClickable(true);
-            XposedBridge.log(TAG + ": forced MyDevices Off mode row visible/clickable"
-                    + " model=" + getMyDevicesAirPodsModel(activity));
-        }
-    }
-
-    private static final class ForceMyDevicesOffModeHook extends XC_MethodHook {
-        @Override
-        protected void beforeHookedMethod(MethodHookParam param) {
-            try {
-                if (param.args == null || param.args.length < 1 || !(param.args[0] instanceof Integer)) {
-                    return;
-                }
-                int original = ((Integer) param.args[0]).intValue();
-                if (!shouldPatchMyDevicesFeatureMask(param.thisObject, original)) {
-                    return;
-                }
-                int patched = original | FEATURE_NOISE_OFF;
-                if (patched != original) {
-                    param.args[0] = Integer.valueOf(patched);
-                    XposedBridge.log(TAG + ": patched MyDevices feature mask "
-                            + original + "/0x" + Integer.toHexString(original)
-                            + " -> " + patched + "/0x" + Integer.toHexString(patched));
-                }
-            } catch (Throwable t) {
-                XposedBridge.log(TAG + ": patch feature mask err " + t);
-            }
-        }
-
-        @Override
-        protected void afterHookedMethod(MethodHookParam param) {
-            try {
-                Object activity = param.thisObject;
-                if (activity == null) return;
-                if (param.args == null || param.args.length < 1 || !(param.args[0] instanceof Integer)) {
-                    return;
-                }
-                int mask = ((Integer) param.args[0]).intValue();
-                if (isMyDevicesOffModeTarget(activity, mask)) {
-                    forceMyDevicesOffRowVisible(activity);
-                }
-            } catch (Throwable t) {
-                XposedBridge.log(TAG + ": force Off row err " + t);
-            }
-        }
-    }
-
-    private static final class ForceMyDevicesOffRowAfterRefreshHook extends XC_MethodHook {
-        @Override
-        protected void afterHookedMethod(MethodHookParam param) {
-            try {
-                if (isMyDevicesOffModeTarget(param.thisObject, 0)) {
-                    forceMyDevicesOffRowVisible(param.thisObject);
-                }
-            } catch (Throwable t) {
-                XposedBridge.log(TAG + ": refresh Off row err " + t);
-            }
-        }
-    }
-
-    /**
-     * AirPods drop the idle HFP profile a few seconds after connect; MyDevices
-     * maps that single-profile disconnect onto the whole device. Drop the bogus
-     * STATE_DISCONNECTED while the device is really still connected, but honor a
-     * disconnect the user just asked for (see MyDevicesUserDisconnectHook).
-     */
-    private static final class MyDevicesBluetoothManagerStateHook extends XC_MethodHook {
-        @Override
-        protected void beforeHookedMethod(MethodHookParam param) {
-            try {
-                if (param.args == null || param.args.length < 1 || !(param.args[0] instanceof String)) {
-                    return;
-                }
-                String state = (String) param.args[0];
-                if ("STATE_CONNECTED".equals(state) || "STATE_BONDED".equals(state)) {
-                    sMyDevicesUserDisconnectAtMs = 0L;
-                    return;
-                }
-                if (!"STATE_DISCONNECTED".equals(state)) {
-                    return;
-                }
-                if (isRecent(sMyDevicesUserDisconnectAtMs, MYDEVICES_USER_DISCONNECT_WINDOW_MS)) {
-                    // User tapped Disconnect: let it through so the page greys out.
-                    XposedBridge.log(TAG + ": allowing user-initiated MyDevices STATE_DISCONNECTED");
-                    return;
-                }
-                if (isMyDevicesManagerCurrentDeviceConnected(param.thisObject)) {
-                    param.setResult(null);
-                    XposedBridge.log(TAG + ": blocked false MyDevices manager STATE_DISCONNECTED"
-                            + " because BluetoothDevice.isConnected=true");
-                }
-            } catch (Throwable t) {
-                XposedBridge.log(TAG + ": MyDevices manager state hook err " + t);
-            }
-        }
-    }
-
-    private static final class MyDevicesUserDisconnectHook extends XC_MethodHook {
-        @Override
-        protected void beforeHookedMethod(MethodHookParam param) {
-            sMyDevicesUserDisconnectAtMs = System.currentTimeMillis();
-            XposedBridge.log(TAG + ": MyDevices user requested disconnect (o);"
-                    + " honoring STATE_DISCONNECTED for next "
-                    + MYDEVICES_USER_DISCONNECT_WINDOW_MS + "ms");
-        }
-    }
+    // ---- AAP frame helpers (function #1) ----------------------------------
 
     private static final class BlockingOutputStream extends FilterOutputStream {
         BlockingOutputStream(OutputStream out) {
