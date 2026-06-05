@@ -46,13 +46,16 @@ Root 用户推荐使用 LSPosed 模块。它用于三进程注入修复：
 
 这个版本需要手动打开应用、选择已配对 AirPods 并点击 `Restore Off`。如果系统蓝牙进程已经占用同一通道，连接可能失败。
 
-## Shizuku 实验版
+## Shizuku 版
 
-仓库还提供一个 Shizuku 实验版：`AirpodsOffFix-Shizuku.apk`。
+仓库还提供一个 Shizuku 版：`AirpodsOffFix-Shizuku.apk`。
 
 它不是 LSPosed 模块。应用本身只负责请求 Shizuku 授权、选择已配对 AirPods、启动/停止 shell 身份的 `BtHold` 守护进程以及查看日志。真正的 AAP L2CAP 控制通道由 Shizuku 启动的 `shell uid=2000` 进程打开，复用已经实测可用的 `app_process BtHold` 路径。
 
 当前策略是连接后启动 `Start Hold`：守护进程会在连接后的短保护窗内把系统回弹的 ANC/通透拉回 Off；保护窗结束后，如果用户手动切到 ANC/通透，会尊重用户选择，不再强制拉回 Off。
+
+<img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/8911d8f5-7b08-407e-8501-68710950fc87" />
+
 
 ## 从源码构建
 
