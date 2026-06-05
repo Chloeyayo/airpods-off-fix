@@ -54,7 +54,8 @@ Root 用户推荐使用 LSPosed 模块。它用于三进程注入修复：
 
 当前策略是连接后启动 `Start Hold`：守护进程会在连接后的短保护窗内把系统回弹的 ANC/通透拉回 Off；保护窗结束后，如果用户手动切到 ANC/通透，会尊重用户选择，不再强制拉回 Off。
 
-<img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/8911d8f5-7b08-407e-8501-68710950fc87" />
+<img width="1080" height="2377" alt="1034594_29c0557a_2303_3961_492@1272x2800 jpeg m" src="https://github.com/user-attachments/assets/7ed8ba33-5a46-4c25-b475-a8df0aaf84a8" />
+
 
 
 ## 从源码构建
@@ -158,6 +159,9 @@ The repository also provides an experimental Shizuku build: `AirpodsOffFix-Shizu
 It is not an LSPosed module. The app only requests Shizuku permission, lets the user select paired AirPods, starts/stops a shell-uid `BtHold` daemon, and displays its log. The actual AAP L2CAP control channel is opened by the Shizuku-launched `shell uid=2000` process, reusing the verified `app_process BtHold` path.
 
 Current behavior: after `Start Hold`, the daemon enforces Off during a short grace window after connection to counter the system rebound to ANC/Transparency. After that grace window, manual user mode changes are respected.
+
+<img width="1080" height="2377" alt="1034594_29c0557a_2303_3961_492@1272x2800 jpeg m" src="https://github.com/user-attachments/assets/f443b084-b6a5-4973-aa23-90404f24cd72" />
+
 
 ## Build From Source
 
