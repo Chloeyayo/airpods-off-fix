@@ -102,11 +102,16 @@ public class BtHold {
         int known = btConnected(dev);
         if (known < 0) return true; // fallback to the old AAP-connect driven behavior
         long lastLog = 0;
+        long waitStart = now();
         while (now() < deadline) {
             if (btConnected(dev) == 1) return true;
             if (now() - lastLog >= 3000) {
                 System.out.println("[BT-WAIT] t=" + t() + "ms  waiting for native Bluetooth connection");
                 lastLog = now();
+            }
+            if (now() - waitStart >= 1200) {
+                System.out.println("[BT-WAIT] t=" + t() + "ms  isConnected() still false; probing AAP anyway");
+                return true;
             }
             Thread.sleep(300);
         }
