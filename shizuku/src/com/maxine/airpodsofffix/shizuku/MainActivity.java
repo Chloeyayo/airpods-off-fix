@@ -34,6 +34,7 @@ import rikka.shizuku.Shizuku;
 public class MainActivity extends Activity {
     private static final int REQ_BT = 100;
     private static final int REQ_SHIZUKU = 101;
+    private static final int CONNECT_DELAY_MS = 2500;
     private static final String REMOTE_DEX = "/data/local/tmp/airpods_off_bthold.dex";
     private static final String REMOTE_LOG = "/data/local/tmp/bthold_shizuku.log";
     private static final String KILL_DAEMON =
@@ -252,9 +253,9 @@ public class MainActivity extends Activity {
             String cmd = "rm -f " + REMOTE_LOG + "; "
                     + "CLASSPATH=" + REMOTE_DEX
                     + " nohup app_process /system/bin BtHold " + addr
-                    + " 3600 8000 > " + REMOTE_LOG + " 2>&1 &";
+                    + " 3600 8000 " + CONNECT_DELAY_MS + " > " + REMOTE_LOG + " 2>&1 &";
             runShell(cmd);
-            logFromWorker("Daemon started. Log: " + REMOTE_LOG);
+            logFromWorker("Daemon started. Connect delay: " + CONNECT_DELAY_MS + "ms. Log: " + REMOTE_LOG);
             Thread.sleep(2500);
             refreshRemoteLog();
         } catch (Throwable t) {

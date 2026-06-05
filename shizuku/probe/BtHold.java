@@ -25,9 +25,9 @@ import java.util.Arrays;
  *   - then HOLD that same socket open, passively reading telemetry; re-assert ONLY if it flips.
  *   - reconnect ONLY when the channel genuinely dies (real disconnect). No polling churn.
  *
- * Expected UX: connect -> (brief transparency) -> off, with NO mid-disconnect.
+ * Expected UX: native connect chime -> (brief transparency) -> off, with NO mid-disconnect.
  *
- * Args: <addr> [runSeconds=300]
+ * Args: <addr> [runSeconds=300] [graceMs=8000] [connectDelayMs=0]
  */
 public class BtHold {
     static final String UUID_STR = "74ec2172-0bad-4d01-8f77-997b2be0722a";
@@ -87,6 +87,32 @@ public class BtHold {
         return ad;
     }
 
+    // Hidden but available to shell: lets us wait for the native Bluetooth connection first,
+    // so we don't open the AAP channel early enough to swallow the AirPods connect chime.
+    static int btConnected(BluetoothDevice dev) {
+        try {
+            Boolean ok = (Boolean) BluetoothDevice.class.getMethod("isConnected").invoke(dev);
+            return ok.booleanValue() ? 1 : 0;
+        } catch (Throwable th) {
+            return -1;
+        }
+    }
+
+    static boolean waitNativeConnect(BluetoothDevice dev, long deadline) throws InterruptedException {
+        int known = btConnected(dev);
+        if (known < 0) return true; // fallback to the old AAP-connect driven behavior
+        long lastLog = 0;
+        while (now() < deadline) {
+            if (btConnected(dev) == 1) return true;
+            if (now() - lastLog >= 3000) {
+                System.out.println("[BT-WAIT] t=" + t() + "ms  waiting for native Bluetooth connection");
+                lastLog = now();
+            }
+            Thread.sleep(300);
+        }
+        return false;
+    }
+
     // send the unlock+Off sequence on the given socket's stream; return the method if telemetry confirms OFF, else null
     static String fixOff(OutputStream os) throws Exception {
         os.write(ALLOW_OFF); os.flush(); Thread.sleep(60);
@@ -104,8 +130,10 @@ public class BtHold {
             try{ Looper.prepareMainLooper(); }catch(Throwable ig){}
             String addr=args[0]; int runSec=args.length>1?Integer.parseInt(args[1]):300;
             long graceMs=args.length>2?Long.parseLong(args[2]):8000L; // enforce Off only within this window after each connect; after it, respect manual mode changes
+            long connectDelayMs=args.length>3?Long.parseLong(args[3]):0L; // delay AAP open after native BT connect, preserving the AirPods connect chime
             System.out.println("BT: uid="+android.os.Process.myUid()+" addr="+addr+" runSec="+runSec
-                +"\nBT: >>> single-shot + HOLD Off enforcer (no churn). Reconnect / restart BT to test UX. <<<");
+                +" graceMs="+graceMs+" connectDelayMs="+connectDelayMs
+                +"\nBT: >>> native-connect delay + single-shot/HOLD Off enforcer (no churn). Reconnect / restart BT to test UX. <<<");
             BluetoothAdapter ad=buildAdapter(); if(ad==null){System.out.println("BT: no adapter"); return;}
             BluetoothDevice dev=ad.getRemoteDevice(addr); String nm; try{nm=dev.getName();}catch(Throwable th){nm="<?>";}
             System.out.println("BT: device="+dev+" name="+nm);
@@ -113,6 +141,11 @@ public class BtHold {
 
             long deadline=now()+runSec*1000L; int cycles=0; long lastAbsent=0;
             while(now()<deadline){
+                if (!waitNativeConnect(dev, deadline)) break;
+                if (connectDelayMs > 0) {
+                    System.out.println("[BT-ON] t=" + t() + "ms  native Bluetooth connected; delaying AAP open by " + connectDelayMs + "ms");
+                    Thread.sleep(connectDelayMs);
+                }
                 // ---- BURST: rapid rounds win the channel + confirm Off (beats zombie/contention); keep the winning socket ----
                 BluetoothSocket held=null; OutputStream heldOs=null; int m0Seen=-1; String how="-"; int burstRounds=0; long burstStart=now();
                 for(int b=0; b<14 && now()<deadline && held==null; b++){
