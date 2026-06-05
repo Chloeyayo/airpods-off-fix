@@ -22,7 +22,7 @@
 build-root\MyDevices-17.1.5-AirPodsOffFix-patched.apk
 ```
 
-注意：这个 APK 会重新签名，不能直接 `adb install -r` 覆盖原厂签名的设备空间。Root 用户需要用系统应用替换或 Magisk overlay 的方式替换原 `com.heytap.mydevices`。仓库和 release 不内置 OPPO/ColorOS 原厂完整 APK。
+注意：这个 APK 会重新签名，不能直接 `adb install -r` 覆盖系统里的设备空间。Root 用户需要用系统应用替换或 Magisk overlay 的方式替换原 `com.heytap.mydevices`。
 
 当前 patch 点：
 
@@ -133,7 +133,7 @@ build-root\MyDevices-17.1.5-AirPodsOffFix-patched.apk
 
 ## 说明
 
-这是针对特定 ColorOS/OPlus 蓝牙与 MyDevices 行为的修复项目，不保证适用于所有 ROM、所有 AirPods 型号或所有系统版本。项目不包含原厂应用代码。
+这是针对特定 ColorOS/OPlus 蓝牙与 MyDevices 行为的修复项目，不保证适用于所有 ROM、所有 AirPods 型号或所有系统版本。
 
 ## English
 
@@ -157,7 +157,7 @@ Output:
 build-root\MyDevices-17.1.5-AirPodsOffFix-patched.apk
 ```
 
-The output APK is re-signed, so it cannot be installed over the vendor-signed system app with normal `adb install -r`. Root users should replace or overlay the original `com.heytap.mydevices` system APK. This repository and its releases do not include proprietary vendor APKs.
+The output APK is re-signed, so it cannot be installed over the system app with normal `adb install -r`. Root users should replace or overlay the original `com.heytap.mydevices` system APK.
 
 Current patch:
 
@@ -256,4 +256,4 @@ build-shizuku\AirpodsOffFix-Shizuku.apk
 
 ## Notes
 
-This project targets specific ColorOS/OPlus Bluetooth and MyDevices behavior. It is not guaranteed to work on every ROM, AirPods model, or system version. It does not include proprietary vendor app code.
+This project targets specific ColorOS/OPlus Bluetooth and MyDevices behavior. It is not guaranteed to work on every ROM, AirPods model, or system version.
