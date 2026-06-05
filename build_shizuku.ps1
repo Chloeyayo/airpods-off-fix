@@ -21,31 +21,33 @@ New-Item -ItemType Directory -Force "$OUT\classes","$OUT\dex" | Out-Null
 
 function Check($name){ if($LASTEXITCODE -ne 0){ Write-Output "FAILED at: $name (exit $LASTEXITCODE)"; exit 1 } }
 
-Write-Output "==== 1) javac app ===="
-$src = Get-ChildItem -Recurse "$APP\src" -Filter *.java | ForEach-Object { $_.FullName }
+Write-Output "==== 1) aapt2 compile/link ===="
+New-Item -ItemType Directory -Force "$OUT\generated" | Out-Null
+& "$BT\aapt2.exe" compile --dir "$APP\res" -o "$OUT\compiled_res.zip" 2>&1; Check "aapt2 compile"
+& "$BT\aapt2.exe" link -I "$ANDJAR" --manifest "$APP\AndroidManifest.xml" --min-sdk-version 29 --target-sdk-version 34 --java "$OUT\generated" -o "$OUT\base.apk" "$OUT\compiled_res.zip" 2>&1; Check "aapt2 link"
+
+Write-Output "==== 2) javac app ===="
+$src = @(Get-ChildItem -Recurse "$APP\src" -Filter *.java | ForEach-Object { $_.FullName })
+$src += @(Get-ChildItem -Recurse "$OUT\generated" -Filter *.java | ForEach-Object { $_.FullName })
 & $JAVAC -Xlint:-options --release 8 -cp "$ANDJAR;$SHIZUKU_CP" -d "$OUT\classes" $src 2>&1; Check "javac app"
 
-Write-Output "==== 2) jar app classes ===="
+Write-Output "==== 3) jar app classes ===="
 & $JAR cf "$OUT\app.jar" -C "$OUT\classes" . 2>&1; Check "jar"
 
-Write-Output "==== 3) d8 ===="
+Write-Output "==== 4) d8 ===="
 & "$BT\d8.bat" --min-api 29 --lib "$ANDJAR" --output "$OUT\dex" "$OUT\app.jar" "$SHIZUKU\api\classes.jar" "$SHIZUKU\provider\classes.jar" "$SHIZUKU\aidl-aar\classes.jar" 2>&1; Check "d8"
 
-Write-Output "==== 3b) build BtHold asset ===="
+Write-Output "==== 5) build BtHold asset ===="
 $BTHOLD_OUT = "$OUT\bthold"
 New-Item -ItemType Directory -Force "$BTHOLD_OUT" | Out-Null
 & $JAVAC -Xlint:-options -source 8 -target 8 -bootclasspath "$ANDJAR" -d "$BTHOLD_OUT" "$APP\probe\BtHold.java" 2>&1; Check "javac BtHold"
 $btClasses = Get-ChildItem -LiteralPath "$BTHOLD_OUT" -Filter *.class | ForEach-Object { $_.FullName }
 & "$BT\d8.bat" --min-api 29 --output "$BTHOLD_OUT" $btClasses 2>&1; Check "d8 BtHold"
 
-Write-Output "==== 4) aapt2 compile/link ===="
-& "$BT\aapt2.exe" compile --dir "$APP\res" -o "$OUT\compiled_res.zip" 2>&1; Check "aapt2 compile"
-& "$BT\aapt2.exe" link -I "$ANDJAR" --manifest "$APP\AndroidManifest.xml" --min-sdk-version 29 --target-sdk-version 34 -o "$OUT\base.apk" "$OUT\compiled_res.zip" 2>&1; Check "aapt2 link"
-
-Write-Output "==== 5) assemble ===="
+Write-Output "==== 6) assemble ===="
 python "$ROOT\assemble_plain_apk.py" "$OUT\base.apk" "$OUT\dex\classes.dex" "$OUT\unsigned.apk" "$BTHOLD_OUT\classes.dex" "assets/bthold.dex" 2>&1; Check "assemble"
 
-Write-Output "==== 6) zipalign/sign ===="
+Write-Output "==== 7) zipalign/sign ===="
 & "$BT\zipalign.exe" -p -f 4 "$OUT\unsigned.apk" "$OUT\aligned.apk" 2>&1; Check "zipalign"
 $KS = "$ROOT\debug.keystore"
 if(-not (Test-Path $KS)){

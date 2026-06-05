@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/app_bg"
+    android:fillViewport="false"
+    android:focusable="false">
+
+    <LinearLayout
+        android:id="@+id/root_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:focusableInTouchMode="true"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_name"
+                    android:textColor="#172326"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/device_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="未选择耳机"
+                    android:textColor="#667375"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/status_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/pill_stopped"
+                android:gravity="center"
+                android:text="未运行"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/guide_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/guide_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:id="@+id/guide_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="使用前需要 Shizuku 授权"
+                android:textColor="#172326"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/guide_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="请先打开 Shizuku，确认服务正在运行，然后点下方「授权」。授权完成后再启动后台服务。"
+                android:textColor="#4F5D5F"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/auth_button"
+                style="@style/SmallButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="12dp"
+                android:text="授权 Shizuku" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="当前模式"
+                android:textColor="#667375"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/mode_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="未知"
+                android:textColor="#172326"
+                android:textSize="40sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/target_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:text="目标：未知"
+                android:textColor="#667375"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginBottom="10dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/mode_off"
+                    style="@style/ModeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginRight="5dp"
+                    android:layout_weight="1"
+                    android:text="关闭" />
+
+                <Button
+                    android:id="@+id/mode_anc"
+                    style="@style/ModeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="5dp"
+                    android:layout_weight="1"
+                    android:text="降噪" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/mode_transparency"
+                    style="@style/ModeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginRight="5dp"
+                    android:layout_weight="1"
+                    android:text="通透" />
+
+                <Button
+                    android:id="@+id/mode_adaptive"
+                    style="@style/ModeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="5dp"
+                    android:layout_weight="1"
+                    android:text="自适应" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/panel_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/start_button"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginRight="5dp"
+                    android:layout_weight="2"
+                    android:background="@drawable/button_primary"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:text="启动"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/stop_button"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/button_normal"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:text="停止"
+                    android:textColor="#667375"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/profile_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="#667375"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/shizuku_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Shizuku：检查中"
+                android:textColor="#667375"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/panel_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView style="@style/SectionTitle" android:text="耳机设备" />
+            <TextView android:id="@+id/device_meta" style="@style/SecondaryLine" android:text="" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button android:id="@+id/refresh_button" style="@style/SmallButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginRight="4dp" android:layout_weight="1" android:text="刷新耳机" />
+                <Button android:id="@+id/switch_button" style="@style/SmallButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginLeft="4dp" android:layout_weight="1" android:text="切换耳机" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/panel_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView style="@style/SectionTitle" android:text="连接策略" />
+            <TextView style="@style/SecondaryLine" android:text="决定 AirPods 刚连上时，后台服务什么时候接管模式。" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button android:id="@+id/profile_takeover" style="@style/SmallButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginRight="4dp" android:layout_weight="1" android:text="立即保持" />
+                <Button android:id="@+id/profile_balanced" style="@style/SmallButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginLeft="4dp" android:layout_weight="1" android:text="等待提示音" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/wait_delay_value"
+                style="@style/SecondaryLine"
+                android:layout_marginTop="14dp"
+                android:text="提示音等待：2.5秒"
+                android:visibility="gone" />
+
+            <SeekBar
+                android:id="@+id/wait_delay_seek"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:max="55"
+                android:progress="20"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/log_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/panel_bg"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/SectionTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="运行日志" />
+
+                <Button android:id="@+id/log_button" style="@style/SmallButton" android:layout_width="76dp" android:layout_height="match_parent" android:text="刷新" />
+                <Button android:id="@+id/copy_log_button" style="@style/SmallButton" android:layout_width="76dp" android:layout_height="match_parent" android:text="复制" />
+                <Button android:id="@+id/clear_log_button" style="@style/SmallButton" android:layout_width="76dp" android:layout_height="match_parent" android:text="清空" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/log_view"
+                android:layout_width="match_parent"
+                android:layout_height="140dp"
+                android:background="@drawable/log_bg"
+                android:cursorVisible="false"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:fontFamily="monospace"
+                android:gravity="top|start"
+                android:imeOptions="flagNoExtractUi"
+                android:importantForAutofill="no"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:longClickable="true"
+                android:maxLines="9999"
+                android:minLines="1"
+                android:overScrollMode="always"
+                android:padding="10dp"
+                android:scrollbars="vertical"
+                android:textColor="#2D3234"
+                android:textIsSelectable="true"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

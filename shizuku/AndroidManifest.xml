@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.maxine.airpodsofffix.shizuku"
-    android:versionCode="1"
-    android:versionName="0.1-probe">
+    android:versionCode="9"
+    android:versionName="1.9">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
 
@@ -12,7 +12,8 @@
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
 
     <application
-        android:label="AirPods Off Shizuku"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
         <meta-data
