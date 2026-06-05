@@ -38,15 +38,8 @@ Root 用户推荐使用 LSPosed 模块。它用于三进程注入修复：
 3. 在 LSPosed 中启用模块，并确认“推荐应用”已选中。
 4. 重启手机，或重启 Bluetooth / Accessory / MyDevices 相关进程。
 
-## Non-root 实验版
 
-仓库同时提供一个实验 non-root 版：`AirpodsOffFix-NonRoot-v0.1.apk`。
-
-它不是 LSPosed 模块，不能注入系统蓝牙进程，因此不能阻止 ColorOS 发送禁用 Off 的包。它采用另一条路线：作为普通应用尝试连接 AirPods 的 L2CAP PSM `4097`，然后发送“恢复 Off 可用”和“切到 Off 模式”的 AAP 指令。
-
-这个版本需要手动打开应用、选择已配对 AirPods 并点击 `Restore Off`。如果系统蓝牙进程已经占用同一通道，连接可能失败。
-
-## Shizuku 版
+## Non-root推荐：Shizuku 版
 
 仓库还提供一个 Shizuku 版：`AirpodsOffFix-Shizuku.apk`。
 
@@ -57,6 +50,13 @@ Root 用户推荐使用 LSPosed 模块。它用于三进程注入修复：
 <img width="1080" height="2377" alt="1034594_29c0557a_2303_3961_492@1272x2800 jpeg m" src="https://github.com/user-attachments/assets/7ed8ba33-5a46-4c25-b475-a8df0aaf84a8" />
 
 
+## Non-root 实验版
+
+仓库同时提供一个实验 non-root 版：`AirpodsOffFix-NonRoot-v0.1.apk`。
+
+它不是 LSPosed 模块，不能注入系统蓝牙进程，因此不能阻止 ColorOS 发送禁用 Off 的包。它采用另一条路线：作为普通应用尝试连接 AirPods 的 L2CAP PSM `4097`，然后发送“恢复 Off 可用”和“切到 Off 模式”的 AAP 指令。
+
+这个版本需要手动打开应用、选择已配对 AirPods 并点击 `Restore Off`。如果系统蓝牙进程已经占用同一通道，连接可能失败。
 
 ## 从源码构建
 
