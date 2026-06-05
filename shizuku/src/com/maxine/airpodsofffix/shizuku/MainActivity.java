@@ -34,7 +34,7 @@ import rikka.shizuku.Shizuku;
 public class MainActivity extends Activity {
     private static final int REQ_BT = 100;
     private static final int REQ_SHIZUKU = 101;
-    private static final int CONNECT_DELAY_MS = 2500;
+    private static final int DEFAULT_CONNECT_DELAY_MS = 2500;
     private static final String REMOTE_DEX = "/data/local/tmp/airpods_off_bthold.dex";
     private static final String REMOTE_LOG = "/data/local/tmp/bthold_shizuku.log";
     private static final String KILL_DAEMON =
@@ -47,6 +47,7 @@ public class MainActivity extends Activity {
     private ArrayAdapter<String> adapter;
     private ListView listView;
     private TextView logView;
+    private int connectDelayMs = DEFAULT_CONNECT_DELAY_MS;
 
     private final Shizuku.OnRequestPermissionResultListener shizukuPermissionListener =
             new PermissionResultListener(this);
@@ -120,6 +121,14 @@ public class MainActivity extends Activity {
         row2.addView(stop, new LinearLayout.LayoutParams(0, -2, 1));
         row2.addView(log, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(row2, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout row3 = new LinearLayout(this);
+        row3.setOrientation(LinearLayout.HORIZONTAL);
+        row3.addView(button("500ms", new DelayClickListener(this, 500)), new LinearLayout.LayoutParams(0, -2, 1));
+        row3.addView(button("1000ms", new DelayClickListener(this, 1000)), new LinearLayout.LayoutParams(0, -2, 1));
+        row3.addView(button("1500ms", new DelayClickListener(this, 1500)), new LinearLayout.LayoutParams(0, -2, 1));
+        row3.addView(button("2500ms", new DelayClickListener(this, 2500)), new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(row3, new LinearLayout.LayoutParams(-1, -2));
 
         logView = new TextView(this);
         logView.setTextSize(12);
@@ -240,11 +249,12 @@ public class MainActivity extends Activity {
             return;
         }
         final String addr = device.getAddress();
-        append("Starting shell daemon for " + safeName(device) + " " + addr);
-        new Thread(new StartTask(this, addr), "airpods-shizuku-start").start();
+        final int delay = connectDelayMs;
+        append("Starting shell daemon for " + safeName(device) + " " + addr + " delay=" + delay + "ms");
+        new Thread(new StartTask(this, addr, delay), "airpods-shizuku-start").start();
     }
 
-    private void startHoldWorker(String addr) {
+    private void startHoldWorker(String addr, int delayMs) {
         try {
             File localDex = writeAssetDex();
             runShell(KILL_DAEMON);
@@ -253,9 +263,9 @@ public class MainActivity extends Activity {
             String cmd = "rm -f " + REMOTE_LOG + "; "
                     + "CLASSPATH=" + REMOTE_DEX
                     + " nohup app_process /system/bin BtHold " + addr
-                    + " 3600 8000 " + CONNECT_DELAY_MS + " > " + REMOTE_LOG + " 2>&1 &";
+                    + " 3600 8000 " + delayMs + " > " + REMOTE_LOG + " 2>&1 &";
             runShell(cmd);
-            logFromWorker("Daemon started. Connect delay: " + CONNECT_DELAY_MS + "ms. Log: " + REMOTE_LOG);
+            logFromWorker("Daemon started. Connect delay: " + delayMs + "ms. Log: " + REMOTE_LOG);
             Thread.sleep(2500);
             refreshRemoteLog();
         } catch (Throwable t) {
@@ -344,6 +354,11 @@ public class MainActivity extends Activity {
         runOnUiThread(new UiLogTask(this, msg));
     }
 
+    private void setConnectDelay(int delayMs) {
+        connectDelayMs = delayMs;
+        append("Connect delay set to " + delayMs + "ms.");
+    }
+
     private int dp(int v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
@@ -369,11 +384,13 @@ public class MainActivity extends Activity {
     private static final class StartTask implements Runnable {
         private final MainActivity activity;
         private final String addr;
-        StartTask(MainActivity activity, String addr) {
+        private final int delayMs;
+        StartTask(MainActivity activity, String addr, int delayMs) {
             this.activity = activity;
             this.addr = addr;
+            this.delayMs = delayMs;
         }
-        @Override public void run() { activity.startHoldWorker(addr); }
+        @Override public void run() { activity.startHoldWorker(addr, delayMs); }
     }
 
     private static final class StopTask implements Runnable {
@@ -437,5 +454,15 @@ public class MainActivity extends Activity {
         private final MainActivity activity;
         LogClickListener(MainActivity activity) { this.activity = activity; }
         @Override public void onClick(View v) { activity.refreshRemoteLog(); }
+    }
+
+    private static final class DelayClickListener implements View.OnClickListener {
+        private final MainActivity activity;
+        private final int delayMs;
+        DelayClickListener(MainActivity activity, int delayMs) {
+            this.activity = activity;
+            this.delayMs = delayMs;
+        }
+        @Override public void onClick(View v) { activity.setConnectDelay(delayMs); }
     }
 }
