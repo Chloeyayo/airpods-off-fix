@@ -1,5 +1,7 @@
 build/
 build-nonroot/
+build-noshizuku/
+build-shizuku/
 sdk/
 
 *.apk
@@ -36,3 +38,8 @@ lspd-check/
 lspd-live/
 lspd-live-pull/
 .scratch/
+
+screen*.png
+shizuku/screen*.png
+shizuku/probe/out/
+nonroot-no-shizuku/

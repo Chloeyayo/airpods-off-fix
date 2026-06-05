@@ -40,6 +40,14 @@
 
 这个版本需要手动打开应用、选择已配对 AirPods 并点击 `Restore Off`。如果系统蓝牙进程已经占用同一通道，连接可能失败。
 
+## Shizuku 实验版
+
+仓库还提供一个 Shizuku 实验版：`AirpodsOffFix-Shizuku.apk`。
+
+它不是 LSPosed 模块。应用本身只负责请求 Shizuku 授权、选择已配对 AirPods、启动/停止 shell 身份的 `BtHold` 守护进程以及查看日志。真正的 AAP L2CAP 控制通道由 Shizuku 启动的 `shell uid=2000` 进程打开，复用已经实测可用的 `app_process BtHold` 路径。
+
+当前策略是连接后启动 `Start Hold`：守护进程会在连接后的短保护窗内把系统回弹的 ANC/通透拉回 Off；保护窗结束后，如果用户手动切到 ANC/通透，会尊重用户选择，不再强制拉回 Off。
+
 ## 从源码构建
 
 当前构建脚本是 Windows PowerShell 脚本，期望本地存在：
@@ -70,6 +78,18 @@ build\AirpodsOffFix.apk
 
 ```text
 build-nonroot\AirpodsOffFix-NonRoot.apk
+```
+
+构建 Shizuku 实验版：
+
+```powershell
+.\build_shizuku.ps1
+```
+
+输出 APK：
+
+```text
+build-shizuku\AirpodsOffFix-Shizuku.apk
 ```
 
 ## 说明
@@ -116,6 +136,14 @@ It is not an LSPosed module and cannot inject into the system Bluetooth process,
 
 This version must be opened manually. Select a paired AirPods device and tap `Restore Off`. If the system Bluetooth process already owns the same channel, the connection may fail.
 
+## Shizuku Experimental Build
+
+The repository also provides an experimental Shizuku build: `AirpodsOffFix-Shizuku.apk`.
+
+It is not an LSPosed module. The app only requests Shizuku permission, lets the user select paired AirPods, starts/stops a shell-uid `BtHold` daemon, and displays its log. The actual AAP L2CAP control channel is opened by the Shizuku-launched `shell uid=2000` process, reusing the verified `app_process BtHold` path.
+
+Current behavior: after `Start Hold`, the daemon enforces Off during a short grace window after connection to counter the system rebound to ANC/Transparency. After that grace window, manual user mode changes are respected.
+
 ## Build From Source
 
 The current build script is a Windows PowerShell script. It expects:
@@ -146,6 +174,18 @@ Output APK:
 
 ```text
 build-nonroot\AirpodsOffFix-NonRoot.apk
+```
+
+Build the Shizuku experimental APK:
+
+```powershell
+.\build_shizuku.ps1
+```
+
+Output APK:
+
+```text
+build-shizuku\AirpodsOffFix-Shizuku.apk
 ```
 
 ## Notes
