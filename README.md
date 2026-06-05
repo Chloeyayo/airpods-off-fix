@@ -2,20 +2,47 @@
 
 中文 | [English](#english)
 
-一个用于 ColorOS / OPlus 系统的 LSPosed 模块，用来修复 AirPods 在系统耳机设置里的两个问题：
+一个用于 ColorOS / OPlus 系统的 AirPods Off 模式修复项目，目标是解决 ColorOS 16 会把 AirPods Pro 3 的“关闭/Off”降噪模式强行改掉的问题。
+
+- Root 首选：Patch 设备空间 / MyDevices APK，让系统耳机详情页支持“关闭/Off”模式。
+- Root 备用：LSPosed 模块，拦截系统连接 AirPods 时发送的禁用 Off AAP 指令。
+- 非 Root：Shizuku 版，用 shell 身份启动后台守护保持 Off。
+
+## Root 首选：设备空间 Patch 版
+
+`patch_mydevices.ps1` 会把你本机提取出来的 `MyDevices.apk` / 设备空间 APK 反编译、写入 Off 支持位、重打包并签名，输出一个完整的 patched APK。
+
+```powershell
+.\patch_mydevices.ps1 -InputApk .\MyDevices.apk
+```
+
+输出：
+
+```text
+build-root\MyDevices-17.1.5-AirPodsOffFix-patched.apk
+```
+
+注意：这个 APK 会重新签名，不能直接 `adb install -r` 覆盖原厂签名的设备空间。Root 用户需要用系统应用替换或 Magisk overlay 的方式替换原 `com.heytap.mydevices`。仓库和 release 不内置 OPPO/ColorOS 原厂完整 APK。
+
+当前 patch 点：
+
+- 在 ColorOS MyDevices 详情页中显示并保持“关闭/Off”模式入口。
+
+## Root 备用：LSPosed 模块
+
+LSPosed 模块用于更完整的三进程注入修复：
 
 - 阻止系统连接 AirPods 时发送禁用“关闭/Off”降噪模式的 AAP 指令，让“关闭”模式保持可用。
-- 在 ColorOS MyDevices 详情页中显示并保持“关闭/Off”模式入口。
 - 过滤 AirPods 连接后空闲 HFP 断开导致的 MyDevices 页面误灰显。
 
-## 要求
+### 要求
 
 - 已安装并启用 LSPosed。
 - Android 8.0+。
 - LSPosed API / min version: 101。
 - 主要面向 ColorOS 16 / OPlus AirPods 集成。
 
-## 推荐应用
+### 推荐应用
 
 模块已声明 LSPosed “推荐应用”，安装后 LSPosed 应自动提示/标记以下生效应用：
 
@@ -25,7 +52,7 @@
 
 如果 LSPosed 没有自动勾选，请在模块作用域中手动选择以上三个应用，然后重启手机或重启这些目标进程。
 
-## 安装
+### 安装
 
 1. 从 [Releases](../../releases) 下载最新 APK。
 2. 安装 APK。
@@ -92,16 +119,55 @@ build-nonroot\AirpodsOffFix-NonRoot.apk
 build-shizuku\AirpodsOffFix-Shizuku.apk
 ```
 
+生成设备空间 Patch APK：
+
+```powershell
+.\patch_mydevices.ps1 -InputApk .\MyDevices.apk
+```
+
+输出 APK：
+
+```text
+build-root\MyDevices-17.1.5-AirPodsOffFix-patched.apk
+```
+
 ## 说明
 
-这是针对特定 ColorOS/OPlus 蓝牙与 MyDevices 行为的修复模块，不保证适用于所有 ROM、所有 AirPods 型号或所有系统版本。模块不包含原厂应用代码。
+这是针对特定 ColorOS/OPlus 蓝牙与 MyDevices 行为的修复项目，不保证适用于所有 ROM、所有 AirPods 型号或所有系统版本。项目不包含原厂应用代码。
 
 ## English
 
-An LSPosed module for ColorOS / OPlus devices that fixes two AirPods integration issues in the system earbud settings:
+An AirPods Off mode fix project for ColorOS / OPlus devices. It targets the ColorOS 16 behavior that forces AirPods Pro 3 out of Noise Control `Off`.
+
+- Preferred root route: patch the local MyDevices APK so the system earbud detail page supports `Off`.
+- Root fallback: LSPosed module for runtime hooks.
+- Non-root route: Shizuku controller that starts a shell daemon.
+
+## Preferred Root Route: MyDevices Patch
+
+`patch_mydevices.ps1` decompiles your own extracted `MyDevices.apk`, patches the Off-support bit, rebuilds it, and signs a complete patched APK.
+
+```powershell
+.\patch_mydevices.ps1 -InputApk .\MyDevices.apk
+```
+
+Output:
+
+```text
+build-root\MyDevices-17.1.5-AirPodsOffFix-patched.apk
+```
+
+The output APK is re-signed, so it cannot be installed over the vendor-signed system app with normal `adb install -r`. Root users should replace or overlay the original `com.heytap.mydevices` system APK. This repository and its releases do not include proprietary vendor APKs.
+
+Current patch:
+
+- Keeps the `Off` mode entry visible and usable in the ColorOS MyDevices AirPods detail page.
+
+## Root Fallback: LSPosed Module
+
+The LSPosed module provides broader runtime hooks:
 
 - Blocks the AAP command that disables the Noise Control `Off` mode when AirPods connect.
-- Keeps the `Off` mode entry visible and usable in the ColorOS MyDevices AirPods detail page.
 - Filters false MyDevices page grey-out caused by idle HFP profile disconnects after connection.
 
 ## Requirements
@@ -190,4 +256,4 @@ build-shizuku\AirpodsOffFix-Shizuku.apk
 
 ## Notes
 
-This module targets specific ColorOS/OPlus Bluetooth and MyDevices behavior. It is not guaranteed to work on every ROM, AirPods model, or system version. It does not include proprietary vendor app code.
+This project targets specific ColorOS/OPlus Bluetooth and MyDevices behavior. It is not guaranteed to work on every ROM, AirPods model, or system version. It does not include proprietary vendor app code.
