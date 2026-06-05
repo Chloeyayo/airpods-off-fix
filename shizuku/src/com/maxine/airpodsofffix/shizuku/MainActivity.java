@@ -35,6 +35,7 @@ public class MainActivity extends Activity {
     private static final int REQ_BT = 100;
     private static final int REQ_SHIZUKU = 101;
     private static final int DEFAULT_CONNECT_DELAY_MS = 2500;
+    private static final int DEFAULT_GRACE_MS = 8000;
     private static final String REMOTE_DEX = "/data/local/tmp/airpods_off_bthold.dex";
     private static final String REMOTE_LOG = "/data/local/tmp/bthold_shizuku.log";
     private static final String KILL_DAEMON =
@@ -48,6 +49,8 @@ public class MainActivity extends Activity {
     private ListView listView;
     private TextView logView;
     private int connectDelayMs = DEFAULT_CONNECT_DELAY_MS;
+    private int graceMs = DEFAULT_GRACE_MS;
+    private String profileName = "Balanced";
 
     private final Shizuku.OnRequestPermissionResultListener shizukuPermissionListener =
             new PermissionResultListener(this);
@@ -115,20 +118,35 @@ public class MainActivity extends Activity {
         LinearLayout row2 = new LinearLayout(this);
         row2.setOrientation(LinearLayout.HORIZONTAL);
         Button start = button("Start Hold", new StartClickListener(this));
+        Button restart = button("Restart", new RestartClickListener(this));
         Button stop = button("Stop", new StopClickListener(this));
         Button log = button("Log", new LogClickListener(this));
         row2.addView(start, new LinearLayout.LayoutParams(0, -2, 1));
+        row2.addView(restart, new LinearLayout.LayoutParams(0, -2, 1));
         row2.addView(stop, new LinearLayout.LayoutParams(0, -2, 1));
         row2.addView(log, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(row2, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout row3 = new LinearLayout(this);
         row3.setOrientation(LinearLayout.HORIZONTAL);
-        row3.addView(button("500ms", new DelayClickListener(this, 500)), new LinearLayout.LayoutParams(0, -2, 1));
-        row3.addView(button("1000ms", new DelayClickListener(this, 1000)), new LinearLayout.LayoutParams(0, -2, 1));
-        row3.addView(button("1500ms", new DelayClickListener(this, 1500)), new LinearLayout.LayoutParams(0, -2, 1));
-        row3.addView(button("2500ms", new DelayClickListener(this, 2500)), new LinearLayout.LayoutParams(0, -2, 1));
+        row3.addView(button("Stable", new ProfileClickListener(this, "Stable", 500, 8000)), new LinearLayout.LayoutParams(0, -2, 1));
+        row3.addView(button("Balanced", new ProfileClickListener(this, "Balanced", 2500, 8000)), new LinearLayout.LayoutParams(0, -2, 1));
+        row3.addView(button("Chime", new ProfileClickListener(this, "Chime", 6000, 3000)), new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(row3, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout row4 = new LinearLayout(this);
+        row4.setOrientation(LinearLayout.HORIZONTAL);
+        row4.addView(button("500ms", new DelayClickListener(this, 500)), new LinearLayout.LayoutParams(0, -2, 1));
+        row4.addView(button("1500ms", new DelayClickListener(this, 1500)), new LinearLayout.LayoutParams(0, -2, 1));
+        row4.addView(button("2500ms", new DelayClickListener(this, 2500)), new LinearLayout.LayoutParams(0, -2, 1));
+        row4.addView(button("4000ms", new DelayClickListener(this, 4000)), new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(row4, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout row5 = new LinearLayout(this);
+        row5.setOrientation(LinearLayout.HORIZONTAL);
+        row5.addView(button("6000ms", new DelayClickListener(this, 6000)), new LinearLayout.LayoutParams(0, -2, 1));
+        row5.addView(button("8000ms", new DelayClickListener(this, 8000)), new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(row5, new LinearLayout.LayoutParams(-1, -2));
 
         logView = new TextView(this);
         logView.setTextSize(12);
@@ -250,11 +268,14 @@ public class MainActivity extends Activity {
         }
         final String addr = device.getAddress();
         final int delay = connectDelayMs;
-        append("Starting shell daemon for " + safeName(device) + " " + addr + " delay=" + delay + "ms");
-        new Thread(new StartTask(this, addr, delay), "airpods-shizuku-start").start();
+        final int grace = graceMs;
+        final String profile = profileName;
+        append("Starting shell daemon for " + safeName(device) + " " + addr
+                + " profile=" + profile + " delay=" + delay + "ms grace=" + grace + "ms");
+        new Thread(new StartTask(this, addr, delay, grace, profile), "airpods-shizuku-start").start();
     }
 
-    private void startHoldWorker(String addr, int delayMs) {
+    private void startHoldWorker(String addr, int delayMs, int graceMs, String profile) {
         try {
             File localDex = writeAssetDex();
             runShell(KILL_DAEMON);
@@ -263,9 +284,10 @@ public class MainActivity extends Activity {
             String cmd = "rm -f " + REMOTE_LOG + "; "
                     + "CLASSPATH=" + REMOTE_DEX
                     + " nohup app_process /system/bin BtHold " + addr
-                    + " 3600 8000 " + delayMs + " > " + REMOTE_LOG + " 2>&1 &";
+                    + " 3600 " + graceMs + " " + delayMs + " > " + REMOTE_LOG + " 2>&1 &";
             runShell(cmd);
-            logFromWorker("Daemon started. Connect delay: " + delayMs + "ms. Log: " + REMOTE_LOG);
+            logFromWorker("Daemon started. Profile: " + profile + ". Delay: "
+                    + delayMs + "ms. Grace: " + graceMs + "ms. Log: " + REMOTE_LOG);
             Thread.sleep(2500);
             refreshRemoteLog();
         } catch (Throwable t) {
@@ -356,7 +378,15 @@ public class MainActivity extends Activity {
 
     private void setConnectDelay(int delayMs) {
         connectDelayMs = delayMs;
-        append("Connect delay set to " + delayMs + "ms.");
+        profileName = "Custom";
+        append("Connect delay set to " + delayMs + "ms. Grace remains " + graceMs + "ms.");
+    }
+
+    private void setProfile(String name, int delayMs, int graceMs) {
+        profileName = name;
+        connectDelayMs = delayMs;
+        this.graceMs = graceMs;
+        append("Profile set to " + name + ": delay=" + delayMs + "ms grace=" + graceMs + "ms.");
     }
 
     private int dp(int v) {
@@ -385,12 +415,16 @@ public class MainActivity extends Activity {
         private final MainActivity activity;
         private final String addr;
         private final int delayMs;
-        StartTask(MainActivity activity, String addr, int delayMs) {
+        private final int graceMs;
+        private final String profile;
+        StartTask(MainActivity activity, String addr, int delayMs, int graceMs, String profile) {
             this.activity = activity;
             this.addr = addr;
             this.delayMs = delayMs;
+            this.graceMs = graceMs;
+            this.profile = profile;
         }
-        @Override public void run() { activity.startHoldWorker(addr, delayMs); }
+        @Override public void run() { activity.startHoldWorker(addr, delayMs, graceMs, profile); }
     }
 
     private static final class StopTask implements Runnable {
@@ -444,6 +478,15 @@ public class MainActivity extends Activity {
         @Override public void onClick(View v) { activity.startHold(); }
     }
 
+    private static final class RestartClickListener implements View.OnClickListener {
+        private final MainActivity activity;
+        RestartClickListener(MainActivity activity) { this.activity = activity; }
+        @Override public void onClick(View v) {
+            activity.append("Restart requested.");
+            activity.startHold();
+        }
+    }
+
     private static final class StopClickListener implements View.OnClickListener {
         private final MainActivity activity;
         StopClickListener(MainActivity activity) { this.activity = activity; }
@@ -464,5 +507,19 @@ public class MainActivity extends Activity {
             this.delayMs = delayMs;
         }
         @Override public void onClick(View v) { activity.setConnectDelay(delayMs); }
+    }
+
+    private static final class ProfileClickListener implements View.OnClickListener {
+        private final MainActivity activity;
+        private final String name;
+        private final int delayMs;
+        private final int graceMs;
+        ProfileClickListener(MainActivity activity, String name, int delayMs, int graceMs) {
+            this.activity = activity;
+            this.name = name;
+            this.delayMs = delayMs;
+            this.graceMs = graceMs;
+        }
+        @Override public void onClick(View v) { activity.setProfile(name, delayMs, graceMs); }
     }
 }
